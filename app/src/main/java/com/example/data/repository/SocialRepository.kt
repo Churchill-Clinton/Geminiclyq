@@ -6,6 +6,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -1023,6 +1026,47 @@ class SocialRepository(private val dao: SocialDao) {
 
     suspend fun adminDismissAnnouncement(announcementId: Long) {
         dao.dismissAnnouncement(announcementId)
+    }
+
+    private val _maintenanceMode = MutableStateFlow(false)
+    val maintenanceMode: StateFlow<Boolean> = _maintenanceMode.asStateFlow()
+
+    private val _registrationsOpen = MutableStateFlow(true)
+    val registrationsOpen: StateFlow<Boolean> = _registrationsOpen.asStateFlow()
+
+    suspend fun toggleMaintenanceMode(adminName: String): Boolean {
+        val newVal = !_maintenanceMode.value
+        _maintenanceMode.value = newVal
+        logAdminAction(adminName, if (newVal) "Activated Maintenance Mode" else "Deactivated Maintenance Mode", "System Protocol")
+        return newVal
+    }
+
+    suspend fun toggleRegistrationsOpen(adminName: String): Boolean {
+        val newVal = !_registrationsOpen.value
+        _registrationsOpen.value = newVal
+        logAdminAction(adminName, if (newVal) "Opened New Registrations" else "Closed New Registrations", "User Gateway")
+        return newVal
+    }
+
+    suspend fun adminSendWarning(adminName: String, targetUserId: Long, warningText: String) {
+        val targetUser = dao.getUserById(targetUserId)
+        dao.insertNotification(
+            NotificationEntity(
+                type = "system",
+                userId = targetUserId,
+                text = "Official Admin Notice: $warningText",
+                subText = "Issued by $adminName",
+                timestamp = "Just now",
+                isRead = false
+            )
+        )
+        logAdminAction(adminName, "Issued Warning Notice", "@${targetUser?.handle ?: targetUserId}: $warningText")
+    }
+
+    suspend fun adminPurgeFlaggedPosts(adminName: String): Int {
+        val count = dao.purgeFlaggedPosts()
+        logAdminAction(adminName, "Bulk Purged Flagged Posts", "$count posts permanently removed")
+        return count
     }
 
     suspend fun adminResetDatabase(adminName: String) {

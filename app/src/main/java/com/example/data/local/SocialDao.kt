@@ -190,6 +190,9 @@ interface SocialDao {
     @Query("SELECT COUNT(*) FROM posts WHERE isFlagged = 1")
     suspend fun getReportedPostsCount(): Int
 
+    @Query("DELETE FROM posts WHERE isFlagged = 1")
+    suspend fun purgeFlaggedPosts(): Int
+
     // RESET DB
     @Query("DELETE FROM posts")
     suspend fun clearAllPosts()

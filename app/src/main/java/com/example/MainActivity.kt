@@ -4,9 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -137,6 +141,8 @@ fun MainApp(
     val adminLogs by viewModel.adminLogs.collectAsState()
     val platformMetrics by viewModel.platformMetrics.collectAsState()
     val showAuthScreen by viewModel.showAuthScreen.collectAsState()
+    val maintenanceMode by viewModel.maintenanceMode.collectAsState()
+    val registrationsOpen by viewModel.registrationsOpen.collectAsState()
 
     // Dialog states
     val activeCommentPost by viewModel.activeCommentPost.collectAsState()
@@ -152,6 +158,12 @@ fun MainApp(
     LaunchedEffect(Unit) {
         viewModel.toastEvent.collectLatest { message ->
             snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    if (currentTab != ScreenTab.HOME) {
+        BackHandler {
+            viewModel.setTab(ScreenTab.HOME)
         }
     }
 
@@ -203,110 +215,125 @@ fun MainApp(
                         .weight(1f)
                         .fillMaxHeight()
                 ) {
-                    when (currentTab) {
-                        ScreenTab.HOME -> {
-                            HomeScreen(
-                                posts = feedPosts,
-                                stories = stories,
-                                announcements = announcements,
-                                currentFilter = feedFilter,
-                                isAdmin = isAdmin,
-                                onFilterChange = { viewModel.setFeedFilter(it) },
-                                onLikePost = { viewModel.toggleLike(it) },
-                                onCommentPost = { viewModel.openCommentsSheet(it) },
-                                onRepostPost = { viewModel.toggleRepost(it) },
-                                onBookmarkPost = { viewModel.toggleBookmark(it) },
-                                onDeletePost = { viewModel.deletePost(it) },
-                                onReportPost = { viewModel.reportPost(it) },
-                                onAdminPinPost = { viewModel.adminTogglePinPost(it) },
-                                onOpenStory = { viewModel.openStoryViewer(it) },
-                                onAddStory = { viewModel.openAddStoryDialog() },
-                                onOpenCompose = { viewModel.openComposeDialog() },
-                                onOpenAdminPanel = { viewModel.setTab(ScreenTab.ADMIN_PANEL) },
-                                onOpenAuth = { viewModel.openAuthScreen() },
-                                onRefresh = { viewModel.setFeedFilter(feedFilter) }
-                            )
-                        }
-
-                        ScreenTab.EXPLORE -> {
-                            ExploreScreen(
-                                searchQuery = searchQuery,
-                                onSearchChange = { viewModel.setSearchQuery(it) },
-                                allPosts = allPosts,
-                                users = allUsers,
-                                trendingTopics = viewModel.trendingTopics,
-                                onToggleFollow = { viewModel.toggleFollow(it) },
-                                onLikePost = { viewModel.toggleLike(it) },
-                                onCommentPost = { viewModel.openCommentsSheet(it) },
-                                onRepostPost = { viewModel.toggleRepost(it) },
-                                onBookmarkPost = { viewModel.toggleBookmark(it) },
-                                onDeletePost = { viewModel.deletePost(it) },
-                                onReportPost = { viewModel.reportPost(it) },
-                                isAdmin = isAdmin
-                            )
-                        }
-
-                        ScreenTab.CHATS -> {
-                            ChatsScreen(
-                                conversations = conversations,
-                                activeConversation = activeConversation,
-                                messages = messagesForActiveConversation,
-                                onSelectConversation = { viewModel.openConversation(it) },
-                                onBackToList = { viewModel.closeConversation() },
-                                onSendMessage = { viewModel.sendMessage(it) }
-                            )
-                        }
-
-                        ScreenTab.NOTIFICATIONS -> {
-                            NotificationsScreen(
-                                notifications = notifications,
-                                onMarkAllRead = { viewModel.markAllNotificationsRead() },
-                                onClearAll = { viewModel.clearAllNotifications() }
-                            )
-                        }
-
-                        ScreenTab.PROFILE -> {
-                            ProfileScreen(
-                                user = currentUser,
-                                allPosts = allPosts,
-                                onOpenEditProfile = { viewModel.openEditProfileDialog() },
-                                onOpenAdminPanel = { viewModel.setTab(ScreenTab.ADMIN_PANEL) },
-                                onOpenAuth = { viewModel.openAuthScreen() },
-                                onLogout = { viewModel.logout() },
-                                onLikePost = { viewModel.toggleLike(it) },
-                                onCommentPost = { viewModel.openCommentsSheet(it) },
-                                onRepostPost = { viewModel.toggleRepost(it) },
-                                onBookmarkPost = { viewModel.toggleBookmark(it) },
-                                onDeletePost = { viewModel.deletePost(it) },
-                                onReportPost = { viewModel.reportPost(it) },
-                                onAdminPinPost = { viewModel.adminTogglePinPost(it) }
-                            )
-                        }
-
-                        ScreenTab.ADMIN_PANEL -> {
-                            BackHandler(enabled = true) {
-                                viewModel.setTab(ScreenTab.PROFILE)
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = {
+                            if (targetState.ordinal > initialState.ordinal) {
+                                slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
+                            } else {
+                                slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
                             }
-                            AdminPanelScreen(
-                                currentUser = currentUser,
-                                metrics = platformMetrics,
-                                users = allUsers,
-                                posts = allPosts,
-                                logs = adminLogs,
-                                announcements = announcements,
-                                onBack = { viewModel.setTab(ScreenTab.PROFILE) },
-                                onToggleBanUser = { viewModel.adminToggleBanUser(it) },
-                                onToggleVerifyUser = { viewModel.adminToggleVerifyUser(it) },
-                                onToggleUserRole = { viewModel.adminToggleUserRole(it) },
-                                onDeleteUser = { viewModel.adminDeleteUser(it) },
-                                onTogglePinPost = { viewModel.adminTogglePinPost(it) },
-                                onDeletePost = { viewModel.adminDeletePost(it) },
-                                onDismissReports = { viewModel.adminDismissReports(it) },
-                                onBroadcast = { title, msg -> viewModel.adminBroadcast(title, msg) },
-                                onDismissAnnouncement = { viewModel.adminDismissAnnouncement(it) },
-                                onResetDatabase = { viewModel.adminResetDatabase() },
-                                onRefreshMetrics = { viewModel.refreshMetrics() }
-                            )
+                        },
+                        label = "mainTabScreenTransition"
+                    ) { tab ->
+                        when (tab) {
+                            ScreenTab.HOME -> {
+                                HomeScreen(
+                                    posts = feedPosts,
+                                    stories = stories,
+                                    announcements = announcements,
+                                    currentFilter = feedFilter,
+                                    isAdmin = isAdmin,
+                                    onFilterChange = { viewModel.setFeedFilter(it) },
+                                    onLikePost = { viewModel.toggleLike(it) },
+                                    onCommentPost = { viewModel.openCommentsSheet(it) },
+                                    onRepostPost = { viewModel.toggleRepost(it) },
+                                    onBookmarkPost = { viewModel.toggleBookmark(it) },
+                                    onDeletePost = { viewModel.deletePost(it) },
+                                    onReportPost = { viewModel.reportPost(it) },
+                                    onAdminPinPost = { viewModel.adminTogglePinPost(it) },
+                                    onOpenStory = { viewModel.openStoryViewer(it) },
+                                    onAddStory = { viewModel.openAddStoryDialog() },
+                                    onOpenCompose = { viewModel.openComposeDialog() },
+                                    onOpenAdminPanel = { viewModel.setTab(ScreenTab.ADMIN_PANEL) },
+                                    onOpenAuth = { viewModel.openAuthScreen() },
+                                    onRefresh = { viewModel.setFeedFilter(feedFilter) }
+                                )
+                            }
+
+                            ScreenTab.EXPLORE -> {
+                                ExploreScreen(
+                                    searchQuery = searchQuery,
+                                    onSearchChange = { viewModel.setSearchQuery(it) },
+                                    allPosts = allPosts,
+                                    users = allUsers,
+                                    trendingTopics = viewModel.trendingTopics,
+                                    onToggleFollow = { viewModel.toggleFollow(it) },
+                                    onLikePost = { viewModel.toggleLike(it) },
+                                    onCommentPost = { viewModel.openCommentsSheet(it) },
+                                    onRepostPost = { viewModel.toggleRepost(it) },
+                                    onBookmarkPost = { viewModel.toggleBookmark(it) },
+                                    onDeletePost = { viewModel.deletePost(it) },
+                                    onReportPost = { viewModel.reportPost(it) },
+                                    isAdmin = isAdmin
+                                )
+                            }
+
+                            ScreenTab.CHATS -> {
+                                ChatsScreen(
+                                    conversations = conversations,
+                                    activeConversation = activeConversation,
+                                    messages = messagesForActiveConversation,
+                                    onSelectConversation = { viewModel.openConversation(it) },
+                                    onBackToList = { viewModel.closeConversation() },
+                                    onSendMessage = { viewModel.sendMessage(it) }
+                                )
+                            }
+
+                            ScreenTab.NOTIFICATIONS -> {
+                                NotificationsScreen(
+                                    notifications = notifications,
+                                    onMarkAllRead = { viewModel.markAllNotificationsRead() },
+                                    onClearAll = { viewModel.clearAllNotifications() }
+                                )
+                            }
+
+                            ScreenTab.PROFILE -> {
+                                ProfileScreen(
+                                    user = currentUser,
+                                    allPosts = allPosts,
+                                    onOpenEditProfile = { viewModel.openEditProfileDialog() },
+                                    onOpenAdminPanel = { viewModel.setTab(ScreenTab.ADMIN_PANEL) },
+                                    onOpenAuth = { viewModel.openAuthScreen() },
+                                    onLogout = { viewModel.logout() },
+                                    onLikePost = { viewModel.toggleLike(it) },
+                                    onCommentPost = { viewModel.openCommentsSheet(it) },
+                                    onRepostPost = { viewModel.toggleRepost(it) },
+                                    onBookmarkPost = { viewModel.toggleBookmark(it) },
+                                    onDeletePost = { viewModel.deletePost(it) },
+                                    onReportPost = { viewModel.reportPost(it) },
+                                    onAdminPinPost = { viewModel.adminTogglePinPost(it) }
+                                )
+                            }
+
+                            ScreenTab.ADMIN_PANEL -> {
+                                AdminPanelScreen(
+                                    currentUser = currentUser,
+                                    metrics = platformMetrics,
+                                    users = allUsers,
+                                    posts = allPosts,
+                                    logs = adminLogs,
+                                    announcements = announcements,
+                                    maintenanceMode = maintenanceMode,
+                                    registrationsOpen = registrationsOpen,
+                                    onBack = { viewModel.setTab(ScreenTab.PROFILE) },
+                                    onToggleBanUser = { viewModel.adminToggleBanUser(it) },
+                                    onToggleVerifyUser = { viewModel.adminToggleVerifyUser(it) },
+                                    onToggleUserRole = { viewModel.adminToggleUserRole(it) },
+                                    onSendWarningToUser = { id, text -> viewModel.adminSendWarning(id, text) },
+                                    onDeleteUser = { viewModel.adminDeleteUser(it) },
+                                    onTogglePinPost = { viewModel.adminTogglePinPost(it) },
+                                    onDeletePost = { viewModel.adminDeletePost(it) },
+                                    onDismissReports = { viewModel.adminDismissReports(it) },
+                                    onPurgeFlaggedPosts = { viewModel.adminPurgeFlaggedPosts() },
+                                    onToggleMaintenanceMode = { viewModel.adminToggleMaintenanceMode() },
+                                    onToggleRegistrationsOpen = { viewModel.adminToggleRegistrationsOpen() },
+                                    onBroadcast = { title, msg -> viewModel.adminBroadcast(title, msg) },
+                                    onDismissAnnouncement = { viewModel.adminDismissAnnouncement(it) },
+                                    onResetDatabase = { viewModel.adminResetDatabase() },
+                                    onRefreshMetrics = { viewModel.refreshMetrics() }
+                                )
+                            }
                         }
                     }
                 }

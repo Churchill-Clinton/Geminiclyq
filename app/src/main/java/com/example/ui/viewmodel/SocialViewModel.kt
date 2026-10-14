@@ -130,6 +130,9 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
     val announcements: StateFlow<List<SystemAnnouncement>> = repository.getAnnouncementsFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val maintenanceMode: StateFlow<Boolean> = repository.maintenanceMode
+    val registrationsOpen: StateFlow<Boolean> = repository.registrationsOpen
+
     private val _platformMetrics = MutableStateFlow(PlatformMetrics())
     val platformMetrics: StateFlow<PlatformMetrics> = _platformMetrics.asStateFlow()
 
@@ -544,6 +547,43 @@ class SocialViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.adminDismissAnnouncement(announcementId)
             _toastEvent.emit("Announcement dismissed")
+        }
+    }
+
+    fun adminSendWarning(userId: Long, warningText: String) {
+        val admin = _currentUser.value ?: return
+        if (!admin.isAdmin) return
+        viewModelScope.launch {
+            repository.adminSendWarning(admin.name, userId, warningText)
+            _toastEvent.emit("Official Warning Dispatched! ⚠️")
+        }
+    }
+
+    fun adminPurgeFlaggedPosts() {
+        val admin = _currentUser.value ?: return
+        if (!admin.isAdmin) return
+        viewModelScope.launch {
+            val count = repository.adminPurgeFlaggedPosts(admin.name)
+            _toastEvent.emit("Purged $count flagged posts 🧹")
+            refreshMetrics()
+        }
+    }
+
+    fun adminToggleMaintenanceMode() {
+        val admin = _currentUser.value ?: return
+        if (!admin.isAdmin) return
+        viewModelScope.launch {
+            val active = repository.toggleMaintenanceMode(admin.name)
+            _toastEvent.emit(if (active) "Maintenance Mode ACTIVATED 🚨" else "System Normal: Maintenance OFF ✓")
+        }
+    }
+
+    fun adminToggleRegistrationsOpen() {
+        val admin = _currentUser.value ?: return
+        if (!admin.isAdmin) return
+        viewModelScope.launch {
+            val open = repository.toggleRegistrationsOpen(admin.name)
+            _toastEvent.emit(if (open) "User Registrations OPEN ✓" else "User Registrations CLOSED 🔒")
         }
     }
 
