@@ -1,4 +1,4 @@
-name: Build Geminiclyq Android APK
+name: Build Geminiclyq APK
 
 on:
   workflow_dispatch:
@@ -11,31 +11,30 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download project source
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Install Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
+      - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build debug APK
+      - name: Build APK
         run: |
-          chmod +x ./gradlew
+          chmod +x gradlew
           ./gradlew --no-daemon :app:assembleDebug
 
-      - name: Upload APK
+      - name: Save APK
         uses: actions/upload-artifact@v4
         with:
-          name: Geminiclyq-Android-APK
+          name: Geminiclyq-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
